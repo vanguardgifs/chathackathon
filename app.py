@@ -1,6 +1,9 @@
+from flask import Flask, render_template, request, jsonify
 import boto3
 import json
 from botocore.exceptions import ClientError
+
+app = Flask(__name__)
 
 def retrieve_and_generate(region_name, kb_id, model_id, query_text):
     """
@@ -26,7 +29,7 @@ def retrieve_and_generate(region_name, kb_id, model_id, query_text):
             retrievalQuery={'text': query_text},
             retrievalConfiguration={
                 'vectorSearchConfiguration': {
-                    'numberOfResults': 5
+                    'numberOfResults': 1
                 }
             }
         )
@@ -54,9 +57,9 @@ def retrieve_and_generate(region_name, kb_id, model_id, query_text):
             modelId=model_id,
             body=json.dumps({
                 "prompt": prompt,
-                "temperature": 0.2,  # Even lower temperature for more deterministic responses
-                "top_p": 0.9,
-                "max_gen_len": 150   # Further reduced max length
+                # "temperature": 0.2,  # Even lower temperature for more deterministic responses
+                # "top_p": 0.9,
+                # "max_gen_len": 150   # Further reduced max length
             })
         )
         
@@ -77,38 +80,30 @@ def retrieve_and_generate(region_name, kb_id, model_id, query_text):
         return generation.strip()
         
     except ClientError as e:
-        print(f"Error in retrieve and generate: {e}")
-        return None
+        error_message = f"Error in retrieve and generate: {e}"
+        print(error_message)
+        return error_message
 
-def main():
-    # Configuration
-    region_name = 'us-east-1'
-    kb_id = '3JVFPNMRFR'
-    model_id = 'meta.llama3-8b-instruct-v1:0'
-    
-    print("\n===== Welcome to ProdPal =====")
-    print("Your AI assistant for answering questions about products and services.")
-    print("Type 'exit' or 'quit' to end the session.\n")
-    
-    while True:
-        # Get user input for the query
-        query = input("Ask ProdPal a question: ")
-        
-        # Check if user wants to exit
-        if query.lower() in ['exit', 'quit']:
-            print("Thank you for using ProdPal. Goodbye!")
-            break
-        
-        print("\nProdPal is thinking...")
-        rag_response = retrieve_and_generate(region_name, kb_id, model_id, query)
-        
-        if rag_response:
-            print("\nProdPal's response:")
-            print(rag_response)
-            print("\n" + "-" * 50 + "\n")
-        else:
-            print("\nSorry, I couldn't generate a response. Please try again.")
-            print("\n" + "-" * 50 + "\n")
+# Configuration
+REGION_NAME = 'us-east-1'
+KB_ID = '3JVFPNMRFR'
+MODEL_ID = 'meta.llama3-8b-instruct-v1:0'
 
-if __name__ == "__main__":
-    main()
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    data = request.json
+    query = data.get('message', '')
+    
+    if not query:
+        return jsonify({'error': 'No message provided'}), 400
+    
+    response = retrieve_and_generate(REGION_NAME, KB_ID, MODEL_ID, query)
+    
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    app.run(debug=True)
