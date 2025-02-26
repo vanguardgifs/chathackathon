@@ -1,4 +1,6 @@
 @echo off
+echo Setting up ProdPal Web Chat with Lambda Logs Integration...
+
 set CRED_PATH=%USERPROFILE%\.aws\credentials
 
 if not exist "%CRED_PATH%" goto SETUP_CREDS
@@ -6,7 +8,7 @@ goto LOAD_CREDS
 
 :LOAD_CREDS
 echo AWS credentials file exists at %CRED_PATH%, loading credentials...
-goto SETUP_VENV
+goto SETUP_LAMBDA
 
 :SETUP_CREDS
 echo Setting up AWS credentials...
@@ -19,9 +21,26 @@ echo aws_access_key_id=%AWS_ACCESS_KEY_ID% >> "%CRED_PATH%"
 echo aws_secret_access_key=%AWS_SECRET_ACCESS_KEY% >> "%CRED_PATH%"
 echo region=%AWS_DEFAULT_REGION% >> "%CRED_PATH%"
 echo AWS credentials have been set up in %CRED_PATH%
+goto SETUP_LAMBDA
+
+:SETUP_LAMBDA
+echo.
+echo Setting up Lambda function name...
+set /p LAMBDA_FUNCTION_NAME=Enter your Lambda function name (or press Enter to skip): 
+
+if "%LAMBDA_FUNCTION_NAME%"=="" (
+    echo No Lambda function name provided. Using existing value in app.py.
+) else (
+    echo.
+    echo Updating Lambda function name in app.py...
+    powershell -Command "(Get-Content app.py) -replace 'LAMBDA_FUNCTION_NAME = \".*\"', 'LAMBDA_FUNCTION_NAME = \"%LAMBDA_FUNCTION_NAME%\"' | Set-Content app.py"
+    echo Lambda function name updated to: %LAMBDA_FUNCTION_NAME%
+)
+
 goto SETUP_VENV
 
 :SETUP_VENV
+echo.
 echo Setting up Python virtual environment...
 if exist "venv" goto VENV_EXISTS
 goto CREATE_VENV

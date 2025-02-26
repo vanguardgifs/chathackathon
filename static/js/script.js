@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
+    const refreshLogsButton = document.getElementById('refresh-logs-button');
     
     // Auto-resize textarea as user types
     userInput.addEventListener('input', function() {
@@ -19,6 +20,44 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Send message when user clicks send button
     sendButton.addEventListener('click', sendMessage);
+    
+    // Refresh logs when user clicks refresh button
+    refreshLogsButton.addEventListener('click', refreshLogs);
+    
+    function refreshLogs() {
+        // Prevent multiple clicks
+        if (refreshLogsButton.classList.contains('loading')) {
+            return;
+        }
+        
+        // Show loading state
+        refreshLogsButton.classList.add('loading');
+        const originalText = refreshLogsButton.innerHTML;
+        refreshLogsButton.innerHTML = '<i class="fas fa-sync-alt"></i> Refreshing...';
+        
+        // Call the refresh logs endpoint
+        fetch('/api/refresh-logs', {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Add system message to chat
+            if (data.status === 'success') {
+                addMessage('Lambda logs have been refreshed. You can now ask questions about the latest logs.', 'bot');
+            } else {
+                addMessage(`Failed to refresh logs: ${data.message}`, 'bot');
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing logs:', error);
+            addMessage('Sorry, I encountered an error while refreshing the logs. Please try again.', 'bot');
+        })
+        .finally(() => {
+            // Reset button state
+            refreshLogsButton.classList.remove('loading');
+            refreshLogsButton.innerHTML = originalText;
+        });
+    }
     
     function sendMessage() {
         const message = userInput.value.trim();

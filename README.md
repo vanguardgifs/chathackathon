@@ -7,6 +7,7 @@ ProdPal is an AI assistant for answering questions about products and services, 
 - Web-based chat interface similar to ChatGPT or Claude
 - Retrieval-augmented generation using AWS Bedrock
 - Streaming responses that appear gradually as they're generated
+- Lambda logs integration for troubleshooting and monitoring
 - Concise, accurate answers based on your knowledge base
 - Responsive design that works on desktop and mobile
 
@@ -61,6 +62,18 @@ The application implements streaming responses using Server-Sent Events (SSE):
 2. These chunks are sent to the frontend as they become available
 3. The frontend progressively displays the chunks, creating a typing effect
 4. This provides a more engaging user experience similar to ChatGPT and Claude
+
+### Lambda Logs Integration
+
+The application integrates with AWS Lambda logs to provide insights into your serverless functions:
+
+1. Logs are automatically retrieved on startup and refreshed hourly
+2. A "Refresh Logs" button allows manual refresh of the latest logs
+3. **Only error-related log lines** are included in the context for every query
+4. The application filters logs for keywords like 'error', 'exception', 'fail', etc.
+5. This focuses the context on relevant issues while reducing noise
+6. Users can ask about errors without explicitly mentioning "logs" in their query
+7. Configure the Lambda function name in `app.py` by setting the `LAMBDA_FUNCTION_NAME` variable
 
 ## Requirements
 
