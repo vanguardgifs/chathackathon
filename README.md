@@ -6,6 +6,7 @@ ProdPal is an AI assistant for answering questions about products and services, 
 
 - Web-based chat interface similar to ChatGPT or Claude
 - Retrieval-augmented generation using AWS Bedrock
+- Streaming responses that appear gradually as they're generated
 - Concise, accurate answers based on your knowledge base
 - Responsive design that works on desktop and mobile
 
@@ -51,6 +52,15 @@ The application uses AWS Bedrock's retrieveAndGenerate API, which combines retri
 1. Retrieves relevant information from your knowledge base based on the user's query
 2. Automatically generates a concise response using the specified model
 3. Returns a single, focused answer without repetition
+
+### Streaming Implementation
+
+The application implements streaming responses using Server-Sent Events (SSE):
+
+1. The backend simulates streaming by breaking the response into chunks
+2. These chunks are sent to the frontend as they become available
+3. The frontend progressively displays the chunks, creating a typing effect
+4. This provides a more engaging user experience similar to ChatGPT and Claude
 
 ## Requirements
 

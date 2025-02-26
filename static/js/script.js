@@ -39,40 +39,89 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show typing indicator
         showTypingIndicator();
         
-        // Send message to server
+        // Create a message div for the bot response
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', 'bot');
+        
+        const messageContent = document.createElement('div');
+        messageContent.classList.add('message-content');
+        messageContent.innerHTML = ''; // Start empty
+        
+        messageDiv.appendChild(messageContent);
+        
+        // Add the empty message div to the chat
+        chatMessages.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // Connect to the server-sent events endpoint
+        const eventSource = new EventSource(`/api/chat?message=${encodeURIComponent(message)}`);
+        
+        // Handle streaming response
+        eventSource.onmessage = function(event) {
+            // Remove typing indicator if it exists
+            removeTypingIndicator();
+            
+            const data = JSON.parse(event.data);
+            
+            if (data.error) {
+                // Handle error
+                messageContent.innerHTML = 'Sorry, I encountered an error. Please try again.';
+                eventSource.close();
+                
+                // Re-enable input
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                userInput.focus();
+                return;
+            }
+            
+            if (data.done) {
+                // Response is complete
+                eventSource.close();
+                
+                // Re-enable input
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                userInput.focus();
+                return;
+            }
+            
+            if (data.chunk) {
+                // Append the chunk to the message
+                const processedChunk = processText(data.chunk);
+                messageContent.innerHTML += processedChunk + ' ';
+                
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        };
+        
+        // Handle errors
+        eventSource.onerror = function(error) {
+            console.error('EventSource error:', error);
+            eventSource.close();
+            
+            // Remove typing indicator
+            removeTypingIndicator();
+            
+            // Update message content with error
+            messageContent.innerHTML = 'Sorry, I encountered an error. Please try again.';
+            
+            // Re-enable input
+            userInput.disabled = false;
+            sendButton.disabled = false;
+            userInput.focus();
+        };
+        
+        // Send the message to the server using a separate fetch for the POST request
         fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ message: message }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Remove typing indicator
-            removeTypingIndicator();
-            
-            // Add bot response to chat
-            addMessage(data.response, 'bot');
-            
-            // Re-enable input
-            userInput.disabled = false;
-            sendButton.disabled = false;
-            userInput.focus();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            
-            // Remove typing indicator
-            removeTypingIndicator();
-            
-            // Add error message
-            addMessage('Sorry, I encountered an error. Please try again.', 'bot');
-            
-            // Re-enable input
-            userInput.disabled = false;
-            sendButton.disabled = false;
-            userInput.focus();
         });
     }
     
