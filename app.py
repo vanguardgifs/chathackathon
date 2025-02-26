@@ -5,69 +5,50 @@ from botocore.exceptions import ClientError
 
 app = Flask(__name__)
 
-def retrieve_and_generate(region_name, kb_id, model_id, query_text):
+def retrieve_and_generate(region_name, kb_id, model_arn, query_text):
     """
-    Perform a retrieval-augmented generation using the knowledge base and Bedrock model
+    Perform a retrieval-augmented generation using the retrieveAndGenerate API
     
     Parameters:
     region_name (str): AWS region
     kb_id (str): Knowledge base ID
-    model_id (str): Bedrock model ID (e.g., 'meta.llama3-8b-instruct-v1:0')
+    model_arn (str): Model ARN (e.g., 'anthropic.claude-v2:1')
     query_text (str): The query text to send
     
     Returns:
     str: The model's response
     """
     try:
-        # Initialize Bedrock clients
+        # Initialize Bedrock agent runtime client
         bedrock_agent = boto3.client('bedrock-agent-runtime', region_name=region_name)
-        bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name)
         
-        # First retrieve relevant information from the knowledge base
-        retrieve_response = bedrock_agent.retrieve(
-            knowledgeBaseId=kb_id,
-            retrievalQuery={'text': query_text},
-            retrievalConfiguration={
-                'vectorSearchConfiguration': {
-                    'numberOfResults': 1
-                }
+        # Prepare the request payload
+        request_payload = {
+            "input": {
+                "text": query_text
+            },
+            "retrieveAndGenerateConfiguration": {
+                "knowledgeBaseConfiguration": {
+                    "knowledgeBaseId": kb_id,
+                    "modelArn": model_arn
+                },
+                "type": "KNOWLEDGE_BASE"
             }
+        }
+        
+        # Call the retrieveAndGenerate API
+        response = bedrock_agent.retrieve_and_generate(
+            input=request_payload["input"],
+            retrieveAndGenerateConfiguration=request_payload["retrieveAndGenerateConfiguration"]
         )
         
-        # Extract retrieved passages - limit to top 3 most relevant results
-        retrieved_passages = [result['content']['text'] for result in retrieve_response['retrievalResults'][:3]]
-        context = "\n\n".join(retrieved_passages)
+        # Extract the generated text from the response
+        generation = response['output']['text']
         
-        # Now construct a prompt for the model that encourages a single concise response
-        prompt = f"""
-        Context information:
-        {context}
+        # Clean up the response
+        generation = generation.strip()
         
-        Question: {query_text}
-        
-        Provide ONE brief, concise answer to the question based on the context provided.
-        Do not repeat yourself or provide multiple answers.
-        Keep your response short and to the point, focusing only on the most relevant information.
-        Do not prefix your response with "Answer:" or similar labels.
-        """
-        
-        # Call the Bedrock model with the constructed prompt
-        # Using lower temperature and max_gen_len to encourage more concise responses
-        response = bedrock_runtime.invoke_model(
-            modelId=model_id,
-            body=json.dumps({
-                "prompt": prompt,
-                # "temperature": 0.2,  # Even lower temperature for more deterministic responses
-                # "top_p": 0.9,
-                # "max_gen_len": 150   # Further reduced max length
-            })
-        )
-        
-        # Parse the model's response
-        response_body = json.loads(response['body'].read().decode('utf-8'))
-        generation = response_body['generation']
-        
-        # Clean up the response - remove any "Answer:" prefixes and extract just the first answer if multiple exist
+        # Handle potential "Answer:" prefixes
         if "Answer:" in generation:
             # Split by "Answer:" and take only the first answer
             answers = generation.split("Answer:")
@@ -77,7 +58,7 @@ def retrieve_and_generate(region_name, kb_id, model_id, query_text):
                     return answer.strip()
             return answers[1].strip()  # Fallback to the first non-empty answer
         
-        return generation.strip()
+        return generation
         
     except ClientError as e:
         error_message = f"Error in retrieve and generate: {e}"
@@ -87,7 +68,7 @@ def retrieve_and_generate(region_name, kb_id, model_id, query_text):
 # Configuration
 REGION_NAME = 'us-east-1'
 KB_ID = '3JVFPNMRFR'
-MODEL_ID = 'meta.llama3-8b-instruct-v1:0'
+MODEL_ARN = 'meta.llama3-8b-instruct-v1:0'  # Updated to use ARN format
 
 @app.route('/')
 def index():
@@ -101,7 +82,7 @@ def chat():
     if not query:
         return jsonify({'error': 'No message provided'}), 400
     
-    response = retrieve_and_generate(REGION_NAME, KB_ID, MODEL_ID, query)
+    response = retrieve_and_generate(REGION_NAME, KB_ID, MODEL_ARN, query)
     
     return jsonify({'response': response})
 

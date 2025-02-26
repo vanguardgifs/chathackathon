@@ -40,9 +40,17 @@ The application uses the following AWS resources:
 
 - Region: us-east-1 (default)
 - Knowledge Base ID: 3JVFPNMRFR
-- Model ID: meta.llama3-8b-instruct-v1:0
+- Model ARN: anthropic.claude-v2:1
 
 You can modify these settings in the `app.py` file if needed.
+
+## API Implementation
+
+The application uses AWS Bedrock's retrieveAndGenerate API, which combines retrieval and generation in a single API call. This approach:
+
+1. Retrieves relevant information from your knowledge base based on the user's query
+2. Automatically generates a concise response using the specified model
+3. Returns a single, focused answer without repetition
 
 ## Requirements
 
