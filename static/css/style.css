@@ -127,6 +127,37 @@ body {
     border-bottom-left-radius: 4px;
 }
 
+/* Citation styling */
+.citation {
+    display: inline-block;
+    font-size: 0.8em;
+    padding: 1px 4px;
+    margin: 0 2px;
+    border-radius: 3px;
+    font-weight: 500;
+    cursor: help;
+    background-color: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+    position: relative;
+}
+
+.citation:hover::after {
+    content: attr(data-citation-text);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 100;
+    font-size: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
 /* Typing indicator */
 .typing-indicator {
     display: flex;

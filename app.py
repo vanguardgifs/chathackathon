@@ -73,7 +73,7 @@ def retrieve_and_generate_stream(region_name, kb_id, model_arn, query_text):
         # Join the filtered logs back into a string
         filtered_logs = '\n'.join(error_logs) if error_logs else "No errors found in the logs."
         
-        # Include filtered Lambda logs in the query text
+        # Include filtered Lambda logs in the query text without citation instructions
         enhanced_query = f"""
 Question: {query_text}
 
@@ -81,8 +81,8 @@ Here are the recent error logs from the Lambda function that might be relevant:
 
 {filtered_logs}
 
-Please answer the original question using information from the error logs if relevant. 
-If the logs are not relevant to the question, just answer the question directly.
+Please answer the original question using information from the error logs if relevant.
+If the logs are not relevant to the question, use the knowledge base instead.
 """
         
         # Prepare the request payload
@@ -105,6 +105,9 @@ If the logs are not relevant to the question, just answer the question directly.
             retrieveAndGenerateConfiguration=request_payload["retrieveAndGenerateConfiguration"]
         )
         
+        # Print the full response for debugging
+        print("Full response:", json.dumps(response, default=str))
+        
         # Extract the generated text from the response
         generation = response['output']['text']
         
@@ -122,6 +125,89 @@ If the logs are not relevant to the question, just answer the question directly.
                     break
             else:
                 generation = answers[1].strip()  # Fallback to the first non-empty answer
+        
+        # Extract citations if available
+        citations = []
+        if 'citations' in response:
+            print(f"Found {len(response['citations'])} citations in response")
+            citation_number = 1
+            
+            for citation in response['citations']:
+                if 'generatedResponsePart' in citation and 'textResponsePart' in citation['generatedResponsePart']:
+                    text_part = citation['generatedResponsePart']['textResponsePart']
+                    if 'span' in text_part and 'text' in text_part:
+                        start = text_part['span']['start']
+                        end = text_part['span']['end']
+                        text = text_part['text']
+                        
+                        # Get all source information from retrievedReferences
+                        if 'retrievedReferences' in citation and citation['retrievedReferences']:
+                            for ref in citation['retrievedReferences']:
+                                source = "Unknown source"
+                                if 'location' in ref:
+                                    location = ref['location']
+                                    if 'type' in location:
+                                        source = location['type']
+                                        
+                                        # Try to get more specific source info
+                                        for loc_type in ['s3Location', 'webLocation', 'kendraDocumentLocation']:
+                                            if loc_type in location and 'uri' in location[loc_type]:
+                                                source = location[loc_type]['uri']
+                                                break
+                                
+                                # Get content snippet if available
+                                content_snippet = ""
+                                if 'content' in ref and 'text' in ref['content']:
+                                    content_text = ref['content']['text']
+                                    # Limit to first 100 characters
+                                    content_snippet = (content_text[:100] + '...') if len(content_text) > 100 else content_text
+                                
+                                citations.append({
+                                    'number': citation_number,
+                                    'start': start,
+                                    'end': end,
+                                    'text': text,
+                                    'source': source,
+                                    'content_snippet': content_snippet
+                                })
+                                
+                                citation_number += 1
+        
+        # Sort citations by start position (ascending) to assign citation numbers in order
+        citations.sort(key=lambda x: x['start'])
+        
+        # Add citation number and full details to each citation
+        for i, citation in enumerate(citations):
+            citation['number'] = i + 1
+            
+            # Determine citation type
+            citation_type = "Knowledge Base"
+            if "log" in citation['source'].lower():
+                citation_type = "Log"
+                
+            # Add full citation text for hover
+            citation['full_text'] = f"{citation_type}: {citation['source']}"
+        
+        # Sort citations by start position (descending) to avoid index shifting when inserting
+        citations.sort(key=lambda x: x['start'], reverse=True)
+        
+        # Insert citation markers into the text
+        for citation in citations:
+            start = citation['start']
+            end = citation['end']
+            number = citation['number']
+            
+            # Insert citation marker at the end of the cited text
+            generation = generation[:end] + f" [{number}]" + generation[end:]
+            
+        # Add citation data to be sent to the client
+        citation_data = [
+            {
+                'number': citation['number'],
+                'text': citation['full_text']
+            }
+            for citation in sorted(citations, key=lambda x: x['number'])
+        ]
         
         # Simulate streaming by yielding chunks of the response
         # In a real implementation, you would use a streaming API if available
@@ -143,8 +229,8 @@ If the logs are not relevant to the question, just answer the question directly.
             yield f"data: {json.dumps({'chunk': chunk})}\n\n"
             time.sleep(0.1)  # Simulate typing delay
             
-        # Send a completion event
-        yield f"data: {json.dumps({'done': True})}\n\n"
+        # Send a completion event with citation data
+        yield f"data: {json.dumps({'done': True, 'citations': citation_data})}\n\n"
         
     except ClientError as e:
         error_message = f"Error in retrieve and generate: {e}"

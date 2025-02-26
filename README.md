@@ -72,8 +72,10 @@ The application integrates with AWS Lambda logs to provide insights into your se
 3. **Only error-related log lines** are included in the context for every query
 4. The application filters logs for keywords like 'error', 'exception', 'fail', etc.
 5. This focuses the context on relevant issues while reducing noise
-6. Users can ask about errors without explicitly mentioning "logs" in their query
-7. Configure the Lambda function name in `app.py` by setting the `LAMBDA_FUNCTION_NAME` variable
+6. **Responses include numbered citations** that show sources on hover
+7. Citations appear as [1], [2], etc. with full source details on hover
+8. Users can ask about errors without explicitly mentioning "logs" in their query
+9. Configure the Lambda function name in `app.py` by setting the `LAMBDA_FUNCTION_NAME` variable
 
 ## Requirements
 

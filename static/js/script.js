@@ -120,6 +120,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Response is complete
                 eventSource.close();
                 
+                // Store citation data if available
+                if (data.citations) {
+                    currentCitations = data.citations;
+                    console.log("Received citations:", currentCitations);
+                    
+                    // Reprocess the entire message content to apply citations
+                    const fullText = messageContent.innerHTML;
+                    messageContent.innerHTML = processText(fullText);
+                }
+                
                 // Re-enable input
                 userInput.disabled = false;
                 sendButton.disabled = false;
@@ -128,8 +138,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (data.chunk) {
+                // Only process for line breaks and URLs, not citations
+                let processedChunk = data.chunk.replace(/\n/g, '<br>');
+                
+                // Convert URLs to clickable links
+                processedChunk = processedChunk.replace(
+                    /(https?:\/\/[^\s]+)/g, 
+                    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+                );
+                
                 // Append the chunk to the message
-                const processedChunk = processText(data.chunk);
                 messageContent.innerHTML += processedChunk + ' ';
                 
                 // Scroll to bottom
@@ -182,6 +200,9 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
+    // Store citation data for the current response
+    let currentCitations = [];
+    
     function processText(text) {
         // Convert line breaks to <br>
         let processed = text.replace(/\n/g, '<br>');
@@ -191,6 +212,60 @@ document.addEventListener('DOMContentLoaded', function() {
             /(https?:\/\/[^\s]+)/g, 
             '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
         );
+        
+        // Only process citations if we have citation data
+        if (currentCitations.length > 0) {
+            console.log("Processing citations for text:", processed);
+            
+            // Create a temporary div to parse the HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = processed;
+            
+            // Get the text content
+            const textContent = tempDiv.textContent;
+            
+            // Find all citation patterns in the text content
+            const citationRegex = /\[+(\d+)\]+/g;
+            let match;
+            const matches = [];
+            
+            while ((match = citationRegex.exec(textContent)) !== null) {
+                matches.push({
+                    fullMatch: match[0],
+                    number: parseInt(match[1]),
+                    index: match.index
+                });
+            }
+            
+            console.log("Found citation matches:", matches);
+            
+            // If we found matches, create a new HTML string with the citations replaced
+            if (matches.length > 0) {
+                let newHtml = '';
+                let lastIndex = 0;
+                
+                for (const match of matches) {
+                    // Add the text before this match
+                    newHtml += textContent.substring(lastIndex, match.index);
+                    
+                    // Add the citation span
+                    const citation = currentCitations.find(c => c.number === match.number);
+                    const citationText = citation ? citation.text : 'Citation not found';
+                    newHtml += `<span class="citation" data-citation-text="${citationText}">[${match.number}]</span>`;
+                    
+                    // Update the last index
+                    lastIndex = match.index + match.fullMatch.length;
+                }
+                
+                // Add any remaining text
+                newHtml += textContent.substring(lastIndex);
+                
+                // Use the new HTML
+                processed = newHtml;
+                
+                console.log("Processed text with citations:", processed);
+            }
+        }
         
         return processed;
     }
